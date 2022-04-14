@@ -17,7 +17,8 @@ if __name__ == '__main__':
     parser.add_argument('--freeze-encoder', action='store_true', help="Whether to keep the encoder stage frozen. "
                                                                       "Will only be done if not randomly initialized.")
     parser.add_argument('--random-init', action='store_true', help='Randomly initialized BENDR for comparison.')
-    # TODO: parser.add_argument('--multi-gpu', action='store_true', help='Distribute BENDR over multiple GPUs')
+    # TODO:
+    parser.add_argument('--multi-gpu', action='store_true', help='Distribute BENDR over multiple GPUs')
     parser.add_argument('--num-workers', default=4, type=int, help='Number of dataloader workers.')
     parser.add_argument('--results-filename', default=None, help='What to name the spreadsheet produced with all '
                                                                  'final results.')
@@ -54,13 +55,12 @@ if __name__ == '__main__':
         if is_first_rec:
             all_X = rec[0]
             all_y = rec[1]
+            is_first_rec = False
         else:
             all_X = torch.cat((all_X, rec[0]), dim=0)
-            all_y = torch.cat((all_y, rec[1]), dim=1)
+            all_y = torch.cat((all_y, rec[1]), dim=0)
     all_dataset = standardDataset(all_X, all_y)
 
-    # Fold results
-    results = {}
     # Set fixed random number seed
     torch.manual_seed(28)
     # Define the K-fold Cross Validator
@@ -73,12 +73,15 @@ if __name__ == '__main__':
     ######################
     # Start print
     print('--------------------------------')
+    f = open('./logs_' + args.results_filename + '/folds_ids.txt', 'w')
 
     # K-fold Cross Validation model evaluation
     for fold, (train_ids, test_ids) in enumerate(kfold.split(all_dataset)):
         # Print
         print(f'FOLD {fold}')
         print('--------------------------------')
+        f.write(str(train_ids) + '\n')
+        f.write(str(test_ids) + '\n')
         # Sample elements randomly from a given list of ids, no replacement.
         train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
         test_subsampler = torch.utils.data.SubsetRandomSampler(test_ids)
@@ -101,7 +104,7 @@ if __name__ == '__main__':
                                         new_projection_layers=0, dropout=0., trial_embeddings=None, layer_drop=0,
                                         keep_layers=None,
                                         mask_p_t=0.01, mask_p_c=0.005, mask_t_span=0.1, mask_c_span=0.1,
-                                        multi_gpu=False, return_features=True)
+                                        multi_gpu=args.multi_gpu, return_features=True)
         else:
             model = LinearHeadBENDR(n_targets=2, samples_len=samples_tlen * 256, n_chn=20, encoder_h=512,
                                     projection_head=False,
@@ -128,7 +131,7 @@ if __name__ == '__main__':
         torch.save(best_model.state_dict(), './results_{}/best_model_f{}.pt'.format(args.results_filename, fold))
         torch.save(loss_curves, './results_{}/loss_curves_f{}.pt'.format(args.results_filename, fold))
         torch.save(acc_curves, './results_{}/acc_curves_f{}.pt'.format(args.results_filename, fold))
-
+    f.close()
 
 
 

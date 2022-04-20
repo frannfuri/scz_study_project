@@ -566,6 +566,7 @@ class BENDRContextualizer(nn.Module):
 
         if self.start_token is not None:
             in_token = self.start_token * torch.ones((1, 1, 1), requires_grad=True).to(x.device).expand([-1, *x.shape[1:]])
+            #in_token shape 1, batch_size, seq_len   (creo..)
             x = torch.cat([in_token, x], dim=0)
 
         for layer in self.transformer_layers:

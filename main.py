@@ -6,6 +6,7 @@ from datasets import charge_all_data, standardDataset
 from architectures import MODEL_CHOICES, LinearHeadBENDR, BENDRClassification
 from trainables import train_model
 from torch.optim import lr_scheduler
+from torch import nn
 from sklearn.model_selection import KFold
 
 ### CHANGE SPLITSSSSSSS MANUALLY !! ###
@@ -112,12 +113,13 @@ if __name__ == '__main__':
                                     mask_t_span=0.05,
                                     mask_c_span=0.1, classifier_layers=1, return_features=True)
 
-        model = model.to(device)
+        #model = model.to(device)
 
         if not args.random_init:
             model.load_pretrained_modules('./datasets/encoder.pt', './datasets/contextualizer.pt',
                                           freeze_encoder=args.freeze_encoder)
-
+        model = nn.DataParallel(model)
+        model = model.to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.01)
         criterion = torch.nn.CrossEntropyLoss().to(device)
         sched = lr_scheduler.OneCycleLR(optimizer, lr, epochs=num_epochs, steps_per_epoch=len(dataloaders['train']),

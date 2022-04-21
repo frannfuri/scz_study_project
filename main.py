@@ -105,7 +105,7 @@ if __name__ == '__main__':
                                         new_projection_layers=0, dropout=0., trial_embeddings=None, layer_drop=0,
                                         keep_layers=None,
                                         mask_p_t=0.01, mask_p_c=0.005, mask_t_span=0.1, mask_c_span=0.1,
-                                        multi_gpu=args.multi_gpu, return_features=True)
+                                        multi_gpu=False, return_features=True)
         else:
             model = LinearHeadBENDR(n_targets=2, samples_len=samples_tlen * 256, n_chn=20, encoder_h=512,
                                     projection_head=False,
@@ -118,7 +118,8 @@ if __name__ == '__main__':
         if not args.random_init:
             model.load_pretrained_modules('./datasets/encoder.pt', './datasets/contextualizer.pt',
                                           freeze_encoder=args.freeze_encoder)
-        model = nn.DataParallel(model)
+        if args.multi_gpu:
+            model = nn.DataParallel(model)
         model = model.to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.01)
         criterion = torch.nn.CrossEntropyLoss().to(device)

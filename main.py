@@ -2,6 +2,7 @@ import argparse
 import torch
 import yaml
 import os
+import numpy as np
 from datasets import charge_all_data, standardDataset
 from architectures import MODEL_CHOICES, LinearHeadBENDR, BENDRClassification
 from trainables import train_model
@@ -74,15 +75,14 @@ if __name__ == '__main__':
     ######################
     # Start print
     print('--------------------------------')
-    f = open('./logs_' + args.results_filename + '/folds_ids.txt', 'w')
 
     # K-fold Cross Validation model evaluation
     for fold, (train_ids, test_ids) in enumerate(kfold.split(all_dataset)):
         # Print
         print(f'FOLD {fold}')
         print('--------------------------------')
-        f.write(str(train_ids) + '\n')
-        f.write(str(test_ids) + '\n')
+        np.savetxt('./logs_' + args.results_filename + '/train_ids_' + str(fold) + '.csv', train_ids, delimiter=',')
+        np.savetxt('./logs_' + args.results_filename + '/test_ids_' + str(fold) + '.csv', test_ids, delimiter=',')
         # Sample elements randomly from a given list of ids, no replacement.
         train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
         test_subsampler = torch.utils.data.SubsetRandomSampler(test_ids)
@@ -134,7 +134,6 @@ if __name__ == '__main__':
         torch.save(best_model.state_dict(), './results_{}/best_model_f{}.pt'.format(args.results_filename, fold))
         torch.save(loss_curves, './results_{}/loss_curves_f{}.pt'.format(args.results_filename, fold))
         torch.save(acc_curves, './results_{}/acc_curves_f{}.pt'.format(args.results_filename, fold))
-    f.close()
 
 
 

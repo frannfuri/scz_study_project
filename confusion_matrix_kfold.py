@@ -1,12 +1,13 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import yaml
 from datasets import charge_all_data, standardDataset
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from architectures import BENDRClassification
 
 #PARAMETERSSSS
-model = 'bendr'
+model_type = 'bendr'
 dataset = 'datasets/scz_decomp'
 results_filename = 'new'
 
@@ -52,7 +53,7 @@ f=0
 
 for fold_ids in test_ids:
     print('Fold number ' + str(f))
-    if model == 'bendr':
+    if model_type == 'bendr':
         model = BENDRClassification(targets=2, samples_len=samples_tlen * 256, n_chn=20, encoder_h=512,
                                         contextualizer_hidden=3076, projection_head=False,
                                         new_projection_layers=0, dropout=0., trial_embeddings=None, layer_drop=0,
@@ -78,7 +79,7 @@ for fold_ids in test_ids:
         y = y.to(device)
         outputs = model(x)
         _, preds = torch.max(outputs[0], 1)
-        cfm_f = confusion_matrix(y, preds, normalize=True)
+        cfm_f = confusion_matrix(y.detach().cpu(), preds.detach().cpu(), normalize='all')
         print(cfm_f)
     cfm += cfm_f
     f += 1
@@ -86,5 +87,8 @@ print(cfm)
 print('again...')
 cfm = cfm/4
 print(cfm)
+disp = ConfusionMatrixDisplay(cfm)
+disp.plot()
+plt.show()
 
 a = 0

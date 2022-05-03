@@ -9,9 +9,12 @@ from torch.utils.data import Dataset as TorchDataset
 from utils import InstanceTransform, MappingDeep1010, TemporalInterpolation, To1020
 from extras import *
 
-def edf_to_array_epochs(path, label, format_type, tlen, overlap, event_ids, data_max, data_min, chns_consider):
+def edf_to_array_epochs(path, label, format_type, tlen, overlap, event_ids, data_max, data_min, chns_consider, had_annotations):
     if format_type=='edf':
-        new_raw = mne.io.read_raw_edf(path) 
+        new_raw = mne.io.read_raw_edf(path)
+        # TODO: Remove this hardcoding
+        assert new_raw.ch_names == ['EEG Fpz-Cz', 'EEG Pz-Oz', 'EOG horizontal', 'Resp oro-nasal', 'EMG submental', 'Temp rectal', 'Event marker']
+        new_raw.rename_channels({'EEG Fpz-Cz': 'Fpz', 'EEG Pz-Oz': 'Pz'})
     elif format_type=='set':
         new_raw = mne.io.read_raw_eeglab(path)
     else:
@@ -22,7 +25,7 @@ def edf_to_array_epochs(path, label, format_type, tlen, overlap, event_ids, data
     new_raw.drop_channels(ch_to_remove)
     
     print('Processing the epochs of this record')
-    epochs_one_subj = scz_BENDR_dataset(new_raw, tlen=tlen, overlap=overlap, label=label, event_ids=event_ids, data_max=data_max, data_min=data_min)
+    epochs_one_subj = scz_BENDR_dataset(new_raw, tlen=tlen, overlap=overlap, label=label, event_ids=event_ids, data_max=data_max, data_min=data_min, had_annotations=had_annotations)
     is_first_epoch = True
     for ep_id in range(0,len(epochs_one_subj)):
         if is_first_epoch:
@@ -36,18 +39,24 @@ def edf_to_array_epochs(path, label, format_type, tlen, overlap, event_ids, data
     return all_eps_x, all_eps_y    
 
 
-def charge_all_data(directory, format_type, tlen, overlap, event_ids, data_max, data_min, h_control_initials, chns_consider):
+def charge_all_data(directory, format_type, tlen, overlap, event_ids, data_max, data_min, h_control_initials, chns_consider, had_annotations):
     array_epochs_all_subjects = []
     for root, _, files in os.walk(directory):
         i = 0
         for file in sorted(files):
-            if file.endswith(format_type):
+            # TODO: HARDCODED!!
+            if file.endswith(format_type) and 'PSG' in file:
+            #if file.endswith(format_type):
                 print('====================Processing record number ' + str(i) + '======================')
-                if file.startswith(h_control_initials):
-                    label = 0
+                if not had_annotations:
+                    if file.startswith(h_control_initials):
+                        label = 0
+                    else:
+                        label = 1
                 else:
-                    label = 1
-                array_epochs_subj = edf_to_array_epochs(os.path.join(root, file), label, format_type, tlen, overlap, event_ids, data_max, data_min, chns_consider)
+                    label=None
+
+                array_epochs_subj = edf_to_array_epochs(os.path.join(root, file), label, format_type, tlen, overlap, event_ids, data_max, data_min, chns_consider, had_annotations)
                 array_epochs_all_subjects.append(array_epochs_subj)
                 i += 1
     return array_epochs_all_subjects
@@ -72,13 +81,11 @@ class standardDataset(TorchDataset):
 
 
 class scz_BENDR_dataset(TorchDataset):
-    def __init__(self, raw: mne.io.Raw, data_max, data_min, tlen=6, tmin=0, new_sfreq = 256, overlap=2, label=0, had_annotations=False, event_ids=['0', '1']):#deep1010map,
+    def __init__(self, raw: mne.io.Raw, data_max, data_min, tlen=6, tmin=0, new_sfreq = 256, overlap=2, label=None, had_annotations=False, event_ids=['0', '1']):#deep1010map,
         self.filename = raw.filenames[0].split('/')[-1]
         self.event_ids = event_ids
         self.orig_sfreq = raw.info['sfreq']
         self.new_sfreq = new_sfreq
-        # HARDCODE
-        self.epoch_codes_to_class_labels = {0: 0, 1: 1}
         self.ch_names = raw.ch_names
         ch_list = []
         for i in raw.ch_names:
@@ -87,13 +94,20 @@ class scz_BENDR_dataset(TorchDataset):
         
         # Segment the recording
         if had_annotations:
-            events = mne.events_from_annotations(raw, event_id=self.event_ids, chunk_duration=None)[0]
-            self.epochs = mne.Epochs(raw, events, tmin=tmin, tmax=tmin + tlen - 1 / self.orig_sfreq, preload=True, decim=1,
+            # TODO: HARDCODED
+            ans = mne.read_annotations(raw.filenames[0][:-9] + 'C-Hypnogram.edf')
+            ans.delete(-1)
+            raw.set_annotations(ans)
+            events = mne.events_from_annotations(raw)
+            #events = mne.events_from_annotations(raw, event_id=self.event_ids, chunk_duration=None)[0]
+            self.epochs = mne.Epochs(raw, events[0], tmin=tmin, tmax=tmin + tlen - 1 / self.orig_sfreq, preload=True, decim=1,
                           baseline=None, reject_by_annotation=False)
+            self.epoch_codes_to_class_labels = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6}
         else:
             self.epochs =  mne.make_fixed_length_epochs(raw, id=label, duration=tlen, overlap=overlap)
             self.epochs.drop_bad()
-        
+            self.epoch_codes_to_class_labels = {0: 0, 1: 1}
+
         self.tlen = tlen
         self.transforms = list()
         self._different_deep1010s = list()
@@ -152,6 +166,7 @@ class scz_BENDR_dataset(TorchDataset):
 
 
         y = torch.tensor(self.epoch_codes_to_class_labels[ep.events[0, -1]]).squeeze().long()
+        #y = torch.tensor(ep.events[0, -1]).squeeze().long()
 
         return self._execute_transforms(x, y)
 

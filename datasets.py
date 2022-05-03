@@ -14,7 +14,7 @@ def edf_to_array_epochs(path, label, format_type, tlen, overlap, event_ids, data
         new_raw = mne.io.read_raw_edf(path)
         # TODO: Remove this hardcoding
         assert new_raw.ch_names == ['EEG Fpz-Cz', 'EEG Pz-Oz', 'EOG horizontal', 'Resp oro-nasal', 'EMG submental', 'Temp rectal', 'Event marker']
-        new_raw.rename_channels({'EEG Fpz-Cz': 'Fpz', 'EEG Pz-Oz': 'Pz'})
+        new_raw.rename_channels({'EEG Fpz-Cz': 'Fz', 'EEG Pz-Oz': 'Pz'})
     elif format_type=='set':
         new_raw = mne.io.read_raw_eeglab(path)
     else:
@@ -95,14 +95,20 @@ class scz_BENDR_dataset(TorchDataset):
         # Segment the recording
         if had_annotations:
             # TODO: HARDCODED
-            ans = mne.read_annotations(raw.filenames[0][:-9] + 'C-Hypnogram.edf')
+            ans = None
+            for root, _, files in os.walk('/' + os.path.join(*raw.filenames[0].split('/')[:-1])):
+                for file in sorted(files):
+                    if file.startswith(raw.filenames[0].split('/')[-1][:6]) and file.endswith('Hypnogram.edf'):
+                        ans = mne.read_annotations(os.path.join(root, file))
             ans.delete(-1)
             raw.set_annotations(ans)
-            events = mne.events_from_annotations(raw)
+            events = mne.events_from_annotations(raw, {'Sleep stage 1': 1, 'Sleep stage 2': 2,
+                                           'Sleep stage 3': 3, 'Sleep stage 4': 3,
+                                           'Sleep stage R': 4, 'Sleep stage W': 0})
             #events = mne.events_from_annotations(raw, event_id=self.event_ids, chunk_duration=None)[0]
             self.epochs = mne.Epochs(raw, events[0], tmin=tmin, tmax=tmin + tlen - 1 / self.orig_sfreq, preload=True, decim=1,
                           baseline=None, reject_by_annotation=False)
-            self.epoch_codes_to_class_labels = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6}
+            self.epoch_codes_to_class_labels = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4}
         else:
             self.epochs =  mne.make_fixed_length_epochs(raw, id=label, duration=tlen, overlap=overlap)
             self.epochs.drop_bad()

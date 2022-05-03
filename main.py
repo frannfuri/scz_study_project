@@ -100,14 +100,14 @@ if __name__ == '__main__':
 
         # MODEL
         if args.model == MODEL_CHOICES[0]:
-            model = BENDRClassification(targets=data_settings['num_classes'], samples_len=samples_tlen * 256, n_chn=20, encoder_h=512,
+            model = BENDRClassification(targets=data_settings['num_cls'], samples_len=samples_tlen * 256, n_chn=20, encoder_h=512,
                                         contextualizer_hidden=3076, projection_head=False,
                                         new_projection_layers=0, dropout=0., trial_embeddings=None, layer_drop=0,
                                         keep_layers=None,
                                         mask_p_t=0.01, mask_p_c=0.005, mask_t_span=0.1, mask_c_span=0.1,
                                         multi_gpu=False, return_features=True)
         else:
-            model = LinearHeadBENDR(n_targets=data_settings['num_classes'], samples_len=samples_tlen * 256, n_chn=20, encoder_h=512,
+            model = LinearHeadBENDR(n_targets=data_settings['num_cls'], samples_len=samples_tlen * 256, n_chn=20, encoder_h=512,
                                     projection_head=False,
                                     enc_do=0.1, feat_do=0.4, pool_length=4, mask_p_t=0.01, mask_p_c=0.005,
                                     mask_t_span=0.05,

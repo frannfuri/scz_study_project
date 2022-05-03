@@ -324,10 +324,22 @@ def whole_dataset_get_max_and_min(path_to_data, format_type='set', rd=0.9):
     for root, _, files in os.walk(path_to_data):
         i = 0
         for file in sorted(files):
-            if file.endswith(format_type):
+            if file.endswith(format_type): #and 'PSG' in file:
                 print('====================Processing record number ' + str(i) + '======================')
-                new_raw = mne.io.read_raw_eeglab(os.path.join(root, file), preload=True)
-                raw_records.append(new_raw)
+                if format_type=='set':
+                    new_raw = mne.io.read_raw_eeglab(os.path.join(root, file), preload=True)
+                    ch_to_remove = list(set(new_raw.ch_names) - set(['Fz', 'Cz', 'Pz']))
+                    new_raw.drop_channels(ch_to_remove)
+                    raw_records.append(new_raw)
+                elif format_type=='edf':
+                    new_raw = mne.io.read_raw_edf(os.path.join(root, file), preload=True)
+                    # HARDCODED
+                    assert new_raw.ch_names == ['EEG Fpz-Cz', 'EEG Pz-Oz', 'EOG horizontal', 'Resp oro-nasal',
+                                                    'EMG submental', 'Temp rectal', 'Event marker']
+                    new_raw.rename_channels({'EEG Fpz-Cz': 'Fpz', 'EEG Pz-Oz': 'Pz'})
+                    ch_to_remove = list(set(new_raw.ch_names) - set(['Fpz', 'Pz']))
+                    new_raw.drop_channels(ch_to_remove)
+                    raw_records.append(new_raw)
                 i += 1
     pbar = tqdm(raw_records)
     total_dmax = None

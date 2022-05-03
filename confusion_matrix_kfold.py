@@ -8,11 +8,9 @@ from architectures import BENDRClassification
 
 #PARAMETERSSSS
 model_type = 'bendr'
-dataset = 'datasets/scz_decomp'
+dataset = 'datasets/sleep-cassette'
 results_filename = 'new'
 
-## HARDCODED !! ##
-# Modify txt file first! Luego copiar y pegar
 test0 = np.genfromtxt('./logs_' + results_filename + '/test_ids_0.csv', delimiter=',', dtype='int16')
 test1 = np.genfromtxt('./logs_' + results_filename + '/test_ids_1.csv', delimiter=',', dtype='int16')
 test2 = np.genfromtxt('./logs_' + results_filename + '/test_ids_2.csv', delimiter=',', dtype='int16')
@@ -34,7 +32,8 @@ array_epochs_all_subjects = charge_all_data(directory=dataset,
                                             data_max = data_settings['data_max'],
                                             data_min = data_settings['data_min'],
                                             h_control_initials=data_settings['h_control_initials'],
-                                            chns_consider=data_settings['chns_to_consider'])
+                                            chns_consider=data_settings['chns_to_consider'],
+                                            had_annotations=data_settings['had_annotations'])
 
 is_first_rec = True
 for rec in array_epochs_all_subjects:
@@ -48,7 +47,7 @@ for rec in array_epochs_all_subjects:
 all_dataset = standardDataset(all_X, all_y)
 
 test_ids = [test0, test1, test2, test3]
-cfm = np.zeros((2,2))
+cfm = np.zeros((5,5))
 f=0
 
 for fold_ids in test_ids:

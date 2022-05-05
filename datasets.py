@@ -45,8 +45,8 @@ def charge_all_data(directory, format_type, tlen, overlap, event_ids, data_max, 
         i = 0
         for file in sorted(files):
             # TODO: HARDCODED!!
-            if file.endswith(format_type) and 'PSG' in file:
-            #if file.endswith(format_type):
+            #if file.endswith(format_type) and 'PSG' in file:
+            if file.endswith(format_type):
                 print('====================Processing record number ' + str(i) + '======================')
                 if not had_annotations:
                     if file.startswith(h_control_initials):
@@ -57,6 +57,7 @@ def charge_all_data(directory, format_type, tlen, overlap, event_ids, data_max, 
                     label=None
 
                 array_epochs_subj = edf_to_array_epochs(os.path.join(root, file), label, format_type, tlen, overlap, event_ids, data_max, data_min, chns_consider, had_annotations)
+                print(file)
                 array_epochs_all_subjects.append(array_epochs_subj)
                 i += 1
     return array_epochs_all_subjects

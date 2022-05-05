@@ -3,12 +3,12 @@ import pandas as pd
 import numpy as np
 
 if __name__ == '__main__':
-    n_epochs = 10
+    n_epochs = 15
     f1score_available = True
     # Curves my implementation #2 (Dataframe)
     path='./logs_new/'
-    a0 = pd.read_pickle(path + 'train_log.pkl')
-    b0 = pd.read_pickle(path + 'valid_log.pkl')
+    a0 = pd.read_pickle(path + 'train_log_.pkl')
+    b0 = pd.read_pickle(path + 'valid_log_.pkl')
     tr_loss_f0_ = []
     val_loss_f0_ = []
     for i in range(n_epochs):

@@ -10,6 +10,9 @@ from torch.optim import lr_scheduler
 from torch import nn
 from sklearn.model_selection import train_test_split
 
+train_IDs = [0,1,3,4,5,6,8,9] #day11,day13,day2,day6,day7,day9,day4,day5
+test_IDs = [2,7]  #day1,day3
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Fine-tunes BENDER models.")
     parser.add_argument('model', choices=MODEL_CHOICES)
@@ -51,9 +54,15 @@ if __name__ == '__main__':
                                                 h_control_initials=data_settings['h_control_initials'],
                                                 chns_consider=data_settings['chns_to_consider'],
                                                 had_annotations=data_settings['had_annotations'])
+    array_epochs_all_subjects_train = []
+    array_epochs_all_subjects_test = []
+    for i_train in train_IDs:
+        array_epochs_all_subjects_train.append(array_epochs_all_subjects[i_train])
+    for i_test in test_IDs:
+        array_epochs_all_subjects_test.append(array_epochs_all_subjects[i_test])
 
     is_first_rec = True
-    for rec in array_epochs_all_subjects:
+    for rec in array_epochs_all_subjects_train:
         if is_first_rec:
             all_X = rec[0]
             all_y = rec[1]
@@ -61,6 +70,19 @@ if __name__ == '__main__':
         else:
             all_X = torch.cat((all_X, rec[0]), dim=0)
             all_y = torch.cat((all_y, rec[1]), dim=0)
+    all_X_train = all_X
+    all_y_train = all_y
+    is_first_rec = True
+    for rec in array_epochs_all_subjects_test:
+        if is_first_rec:
+            all_X = rec[0]
+            all_y = rec[1]
+            is_first_rec = False
+        else:
+            all_X = torch.cat((all_X, rec[0]), dim=0)
+            all_y = torch.cat((all_y, rec[1]), dim=0)
+    all_X_test = all_X
+    all_y_test = all_y
 
     # Set fixed random number seed
     torch.manual_seed(28)
@@ -72,47 +94,44 @@ if __name__ == '__main__':
     ######################
     # Start print
     print('--------------------------------')
+    np.savetxt('./logs_' + args.results_filename + '/train_ids.csv', train_IDs, delimiter=',')
+    np.savetxt('./logs_' + args.results_filename + '/test_ids.csv', test_IDs, delimiter=',')
     #np.savetxt('./logs_' + args.results_filename + '/train_ids_' + str(fold) + '.csv', train_ids, delimiter=',')
     #np.savetxt('./logs_' + args.results_filename + '/test_ids_' + str(fold) + '.csv', test_ids, delimiter=',')
     # Sample elements randomly from a given list of ids, no replacement.
     #train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
     #test_subsampler = torch.utils.data.SubsetRandomSampler(test_ids)
-    print('TOTAL DATA {}'.format(all_y.shape[0]))
-    X_train, X_test, y_train, y_test = train_test_split(all_X, all_y, test_size=0.2, random_state=1, shuffle=True)
-    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25, random_state=1, shuffle=True)  # 0.25 x 0.8 = 0.2
-    print('TARGET TRAIN 0/1/2/3/4: {}/{}/{}/{}/{},  total: {}'.format(
-        (y_train == 0).sum(), (y_train == 1).sum(), (y_train == 2).sum(), (y_train == 3).sum(), (y_train == 4).sum(),
-        len(y_train)))
-    print('TARGET VALID 0/1/2/3/4: {}/{}/{}/{}/{},  total: {}'.format(
-        (y_val == 0).sum(), (y_val == 1).sum(), (y_val == 2).sum(), (y_val == 3).sum(), (y_val == 4).sum(),
-        len(y_val)))
-    print('TARGET TEST 0/1/2/3/4: {}/{}/{}/{}/{},  total: {}'.format(
-        (y_test == 0).sum(), (y_test == 1).sum(), (y_test == 2).sum(), (y_test == 3).sum(), (y_test == 4).sum(),
-        len(y_test)))
+    print('TOTAL DATA {}'.format(len(all_y_train)+len(all_y_test)))
+    #X_train, X_test, y_train, y_test = train_test_split(all_X, all_y, test_size=0.2, random_state=1, shuffle=True)
+    #X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25, random_state=1, shuffle=True)  # 0.25 x 0.8 = 0.2
+    print('TARGET TRAIN 0/1: {}/{},  total: {}'.format(
+        (all_y_train == 0).sum(), (all_y_train == 1).sum(), len(all_y_train)))
+    print('TARGET VALID 0/1: {}/{},  total: {}'.format(
+        (all_y_test == 0).sum(), (all_y_test == 1).sum(), len(all_y_test)))
 
     class_sample_count = np.array(
-        [len(np.where(y_train == t)[0]) for t in np.unique(y_train)])
+        [len(np.where(all_y_train == t)[0]) for t in np.unique(all_y_train)])
     weight = 1. / class_sample_count
-    samples_weight = np.array([weight[t] for t in y_train])
+    samples_weight = np.array([weight[t] for t in all_y_train])
     samples_weight = torch.from_numpy(samples_weight)
     samples_weight = samples_weight.double()
     sampler_train = torch.utils.data.WeightedRandomSampler(samples_weight, len(samples_weight))
 
     class_sample_count = np.array(
-        [len(np.where(y_val == t)[0]) for t in np.unique(y_val)])
+        [len(np.where(all_y_test == t)[0]) for t in np.unique(all_y_test)])
     weight = 1. / class_sample_count
-    samples_weight = np.array([weight[t] for t in y_val])
+    samples_weight = np.array([weight[t] for t in all_y_test])
     samples_weight = torch.from_numpy(samples_weight)
     samples_weight = samples_weight.double()
     sampler_val = torch.utils.data.WeightedRandomSampler(samples_weight, len(samples_weight))
 
     # Define data loaders for training and testing data in this fold
     trainloader = torch.utils.data.DataLoader(
-                standardDataset(X_train, y_train),
+                standardDataset(all_X_train, all_y_train),
                 batch_size=bs, sampler=sampler_train)
     # It is validloader actually, but for simplicity keeps its last variable name
     testloader = torch.utils.data.DataLoader(
-                standardDataset(X_val, y_val),
+                standardDataset(all_X_test, all_y_test),
                 batch_size=bs, sampler=sampler_val)
     dataloaders = {'train': trainloader, 'val': testloader}
 

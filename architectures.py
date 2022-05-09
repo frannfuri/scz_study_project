@@ -351,7 +351,7 @@ class BENDRClassification(nn.Module):
         self.n_chn = n_chn
         self.return_features = return_features 
         self.targets = targets 
-        self.make_new_classification_layer()
+        self.make_new_classification_layer(numb_of_targets=self.targets)
         self._init_state = self.state_dict()
         
         encoder = ConvEncoderBENDR(n_chn, encoder_h=encoder_h, dropout=dropout, projection_head=projection_head)
@@ -397,6 +397,17 @@ class BENDRClassification(nn.Module):
         if freeze_position_conv:
             for p in self.contextualizer.relative_position.parameters():
                 p.requires_grad = False
+
+    # CUSTOM FUNCTION
+    def load_whole_pretrained_modules(self, state_dict_file, freeze_encoder, freeze_contextualizer, freeze_position_conv,
+                                      freeze_mask_replacement, device):
+        self.load_state_dict(torch.load(state_dict_file, map_location=device))
+        self.encoder.freeze_features(unfreeze=not freeze_encoder)
+        # TODO: WITH MASK REPLACEMENT.REQUIRES_GRAD ?
+        self.contextualizer.freeze_features(unfreeze=not freeze_contextualizer, finetuning=freeze_mask_replacement)
+        if freeze_position_conv:
+            for p in self.contextualizer.relative_position.parameters():
+                p.requires_grad = False
         
     def reset(self):
         self.load_state_dict(self._init_state)
@@ -408,7 +419,7 @@ class BENDRClassification(nn.Module):
         else:
             return self.classifier_forward(features)
     
-    def make_new_classification_layer(self):
+    def make_new_classification_layer(self, numb_of_targets):
         """
         This allows for a distinction between the classification layer(s) and the rest of the network. Using a basic
         formulation of a network being composed of two parts feature_extractor & classifier.
@@ -420,7 +431,7 @@ class BENDRClassification(nn.Module):
         target should override this method, and there should be a variable called `self.classifier`
 
         """
-        classifier = nn.Linear(self.num_features_for_classification, self.targets)
+        classifier = nn.Linear(self.num_features_for_classification, numb_of_targets)
         nn.init.xavier_normal_(classifier.weight)
         classifier.bias.data.zero_()
         self.classifier = nn.Sequential(Flatten(), classifier)

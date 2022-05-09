@@ -9,10 +9,9 @@ from architectures import BENDRClassification
 
 #PARAMETERSSSS
 model_type = 'bendr'
-dataset = 'datasets/sleep-cassette'
+dataset = 'datasets/scz_decomp_beta_single'
 results_filename = 'new'
-X_test = torch.load('./results_' + results_filename + '/X_test_.pt')
-y_test = torch.load('./results_' + results_filename + '/y_test_.pt')
+test0 = np.genfromtxt('./logs_' + results_filename + '/test_ids.csv', delimiter=',', dtype='int16')
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 with open(dataset + '/info.yml') as infile:
@@ -23,16 +22,28 @@ samples_tlen = data_settings['tlen']
 samples_overlap = data_settings['overlap_len']
 
 # Load dataset
-#array_epochs_all_subjects = charge_all_data(directory=args.dataset_directory,
-#                                                format_type=data_settings['format_type'],
-#                                                tlen=samples_tlen, overlap=samples_overlap,
-#                                                event_ids=data_settings['event_ids'],
-#                                                data_max = data_settings['data_max'],
-#                                                data_min = data_settings['data_min'],
-#                                                h_control_initials=data_settings['h_control_initials'],
-#                                                chns_consider=data_settings['chns_to_consider'],
-#                                                had_annotations=data_settings['had_annotations'])
-test_dataset = standardDataset(X_test, y_test)
+array_epochs_all_subjects = charge_all_data(directory=dataset,
+                                                format_type=data_settings['format_type'],
+                                                tlen=samples_tlen, overlap=samples_overlap,
+                                                event_ids=data_settings['event_ids'],
+                                                data_max = data_settings['data_max'],
+                                                data_min = data_settings['data_min'],
+                                                h_control_initials=data_settings['h_control_initials'],
+                                                chns_consider=data_settings['chns_to_consider'],
+                                                had_annotations=data_settings['had_annotations'])
+array_epochs_all_subjects_test = []
+for test_id in test0:
+    array_epochs_all_subjects_test.append(array_epochs_all_subjects[test_id])
+is_first_rec = True
+for rec in array_epochs_all_subjects_test:
+    if is_first_rec:
+        all_X = rec[0]
+        all_y = rec[1]
+        is_first_rec = False
+    else:
+        all_X = torch.cat((all_X, rec[0]), dim=0)
+        all_y = torch.cat((all_y, rec[1]), dim=0)
+test_dataset = standardDataset(all_X, all_y)
 
 if model_type == 'bendr':
     model = BENDRClassification(targets=data_settings['num_cls'], samples_len=samples_tlen * 256, n_chn=20, encoder_h=512,
@@ -47,12 +58,12 @@ model.eval()
 
 model = model.to(device)
 testloader = torch.utils.data.DataLoader(test_dataset,
-                                         batch_size=64,
+                                         batch_size=len(test_dataset),
                                          shuffle=True)
 c = 0
-bac = 0
-acc = 0
-cfm_b = np.zeros((5,5))
+#bac = 0
+#acc = 0
+#cfm_b = np.zeros((5,5))
 for x,y in testloader:
     print('loop:')
     print(c)
@@ -61,13 +72,13 @@ for x,y in testloader:
     y = y.to(device)
     outputs = model(x)
     _, preds = torch.max(outputs[0], 1)
-    cfm_b += confusion_matrix(y.detach().cpu(), preds.detach().cpu(), normalize='all')
-    bac += balanced_accuracy_score(y.detach().cpu(), preds.detach().cpu())
-    acc += accuracy_score(y.detach().cpu(), preds.detach().cpu())
-disp = ConfusionMatrixDisplay(cfm_b/len(testloader))
+    cfm_b = confusion_matrix(y.detach().cpu(), preds.detach().cpu(), normalize='true')
+    bac = balanced_accuracy_score(y.detach().cpu(), preds.detach().cpu())
+    acc = accuracy_score(y.detach().cpu(), preds.detach().cpu())
+disp = ConfusionMatrixDisplay(cfm_b)
 disp.plot()
 plt.show()
-print('BAC: ' + str(bac/len(testloader)))
-print('ACC: ' + str(acc/len(testloader)))
+print('BAC: ' + str(bac))
+print('ACC: ' + str(acc))
 
 a = 0
